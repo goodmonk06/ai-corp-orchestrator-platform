@@ -1,0 +1,23 @@
+{
+  "name": "@ai-corp/shared",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "lint": "echo 'No linting configured'"
+  },
+  "dependencies": {
+    "zod": "^3.22.4",
+    "openai": "^4.24.0",
+    "axios": "^1.6.2",
+    "pino": "^8.17.0",
+    "pino-pretty": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

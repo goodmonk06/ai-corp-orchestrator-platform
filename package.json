@@ -1,0 +1,34 @@
+{
+  "name": "ai-corp-orchestrator-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Corporation Orchestrator Platform - Multi-agent SaaS",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "db:generate": "cd apps/api && pnpm prisma generate",
+    "db:push": "cd apps/api && pnpm prisma db push",
+    "db:migrate": "cd apps/api && pnpm prisma migrate dev",
+    "db:seed": "cd apps/api && pnpm prisma db seed",
+    "db:studio": "cd apps/api && pnpm prisma studio"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prettier": "^3.1.0",
+    "turbo": "^1.11.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.12.0"
+}

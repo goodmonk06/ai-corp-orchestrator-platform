@@ -1,0 +1,333 @@
+// Prisma Schema for AI Corp Orchestrator Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Organization - Multi-tenant root entity
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      Plan     @default(FREE)
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  projects       Project[]
+  agentProfiles  AgentProfile[]
+  workflows      Workflow[]
+  workflowRuns   WorkflowRun[]
+  jobs           Job[]
+  toolDefinitions ToolDefinition[]
+  auditLogs      AuditLog[]
+
+  @@index([slug])
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// User - Organization members with roles
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  organizationId String
+  role           UserRole @default(MEMBER)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownedProjects Project[]    @relation("ProjectOwner")
+  assignedTasks Task[]       @relation("TaskAssignee")
+  auditLogs     AuditLog[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// Project - High-level project management
+model Project {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  status         ProjectStatus @default(PLANNING)
+  ownerId        String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User?        @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  tasks        Task[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// Task - Individual work items within projects
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  projectId   String
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  assigneeId  String?
+  dueDate     DateTime?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([assigneeId])
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// AgentProfile - AI Agent configuration and personality
+model AgentProfile {
+  id             String    @id @default(cuid())
+  name           String
+  role           AgentRole
+  organizationId String
+  personality    String?
+  systemPrompt   String    @db.Text
+  allowedTools   String[]  @default([])
+  model          String    @default("gpt-4-turbo-preview")
+  temperature    Float     @default(0.7)
+  maxTokens      Int       @default(2000)
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentInstances AgentInstance[]
+
+  @@index([organizationId])
+  @@index([role])
+}
+
+enum AgentRole {
+  CEO
+  CFO
+  CTO
+  CMO
+  HR
+  PM
+  DEVELOPER
+  DESIGNER
+  ANALYST
+  CUSTOM
+}
+
+// AgentInstance - Runtime instance of an agent
+model AgentInstance {
+  id             String              @id @default(cuid())
+  profileId      String
+  workflowRunId  String?
+  context        Json?
+  state          AgentInstanceState  @default(IDLE)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  profile     AgentProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun?  @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+
+  @@index([profileId])
+  @@index([workflowRunId])
+  @@index([state])
+}
+
+enum AgentInstanceState {
+  IDLE
+  THINKING
+  ACTING
+  WAITING
+  COMPLETED
+  ERROR
+}
+
+// Workflow - Orchestration flow definition
+model Workflow {
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  steps          Json            // Array of WorkflowStep objects
+  isActive       Boolean         @default(true)
+  trigger        WorkflowTrigger @default(MANUAL)
+  schedule       String?         // Cron expression for SCHEDULED trigger
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         WorkflowRun[]
+
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+enum WorkflowTrigger {
+  MANUAL
+  SCHEDULED
+  EVENT
+}
+
+// WorkflowRun - Execution instance of a workflow
+model WorkflowRun {
+  id            String            @id @default(cuid())
+  workflowId    String
+  status        WorkflowRunStatus @default(PENDING)
+  currentStepId String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  result        Json?
+  error         String?           @db.Text
+  logs          Json?             // Array of log entries
+  organizationId String
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  workflow       Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentInstances AgentInstance[]
+
+  @@index([workflowId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum WorkflowRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Job - Background job queue items
+model Job {
+  id             String    @id @default(cuid())
+  type           JobType
+  status         JobStatus @default(QUEUED)
+  organizationId String
+  payload        Json
+  result         Json?
+  error          String?   @db.Text
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(3)
+  scheduledFor   DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([type])
+  @@index([scheduledFor])
+}
+
+enum JobType {
+  WORKFLOW_RUN
+  AGENT_TASK
+  DATA_SYNC
+  NOTIFICATION
+  CLEANUP
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+// ToolDefinition - Available tools for agents
+model ToolDefinition {
+  id             String   @id @default(cuid())
+  name           String
+  description    String   @db.Text
+  organizationId String?  // null for built-in tools
+  inputSchema    Json
+  outputSchema   Json?
+  endpoint       String?
+  isBuiltin      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([name, organizationId])
+  @@index([organizationId])
+  @@index([isBuiltin])
+}
+
+// AuditLog - Security and compliance logging
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String
+  resource       String
+  resourceId     String?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
