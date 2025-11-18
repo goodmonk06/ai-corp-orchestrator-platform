@@ -17,6 +17,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ai-corp-network
 
   redis:
     image: redis:6-alpine
@@ -30,7 +32,80 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ai-corp-network
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: ai-corp-api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_corp_orchestrator?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PORT: 3001
+      HOST: 0.0.0.0
+      NODE_ENV: production
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      VECTOR_KNOWLEDGE_API_URL: ${VECTOR_KNOWLEDGE_API_URL:-http://localhost:8001}
+      AUTOMATION_RECIPES_API_URL: ${AUTOMATION_RECIPES_API_URL:-http://localhost:8002}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-corp-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: ai-corp-worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_corp_orchestrator?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NODE_ENV: production
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+      VECTOR_KNOWLEDGE_API_URL: ${VECTOR_KNOWLEDGE_API_URL:-http://localhost:8001}
+      AUTOMATION_RECIPES_API_URL: ${AUTOMATION_RECIPES_API_URL:-http://localhost:8002}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - ai-corp-network
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: ai-corp-web
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:3001
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - ai-corp-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  ai-corp-network:
+    driver: bridge
