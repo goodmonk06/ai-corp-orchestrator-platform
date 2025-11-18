@@ -1,0 +1,29 @@
+{
+  "name": "@ai-corp/cli",
+  "version": "1.0.0",
+  "description": "CLI tool for AI Corporation Orchestrator Platform",
+  "main": "dist/index.js",
+  "bin": {
+    "ai-corp": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@ai-corp/shared": "workspace:*",
+    "@prisma/client": "^5.22.0",
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "table": "^6.8.1"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

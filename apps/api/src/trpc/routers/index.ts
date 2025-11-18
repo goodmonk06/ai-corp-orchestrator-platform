@@ -6,6 +6,8 @@ import { tasksRouter } from './tasks';
 import { agentsRouter } from './agents';
 import { workflowsRouter } from './workflows';
 import { runsRouter } from './runs';
+import { notificationsRouter } from './notifications';
+import { metricsRouter } from './metrics';
 
 export const appRouter = router({
   organizations: organizationsRouter,
@@ -15,6 +17,8 @@ export const appRouter = router({
   agents: agentsRouter,
   workflows: workflowsRouter,
   runs: runsRouter,
+  notifications: notificationsRouter,
+  metrics: metricsRouter,
 });
 
 export type AppRouter = typeof appRouter;

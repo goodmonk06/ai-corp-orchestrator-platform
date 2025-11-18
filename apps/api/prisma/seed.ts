@@ -422,14 +422,266 @@ Provide decision with strategic rationale.`,
   });
 
   console.log('✅ Created audit log');
+
+  // Create Project Templates
+  await prisma.projectTemplate.createMany({
+    data: [
+      {
+        name: 'Software Development Project',
+        description: 'Standard template for software development projects',
+        category: 'Engineering',
+        organizationId: org.id,
+        isPublic: false,
+        defaultTasks: [
+          { title: 'Requirements Gathering', priority: 'HIGH' },
+          { title: 'System Design', priority: 'HIGH' },
+          { title: 'Development', priority: 'MEDIUM' },
+          { title: 'Testing & QA', priority: 'HIGH' },
+          { title: 'Deployment', priority: 'URGENT' },
+        ],
+        estimatedDays: 60,
+        metadata: { targetTeamSize: 5 },
+      },
+      {
+        name: 'Marketing Campaign',
+        description: 'Template for running marketing campaigns',
+        category: 'Marketing',
+        organizationId: org.id,
+        isPublic: true,
+        defaultTasks: [
+          { title: 'Campaign Strategy', priority: 'HIGH' },
+          { title: 'Content Creation', priority: 'MEDIUM' },
+          { title: 'Channel Setup', priority: 'MEDIUM' },
+          { title: 'Launch', priority: 'URGENT' },
+          { title: 'Analytics Review', priority: 'MEDIUM' },
+        ],
+        estimatedDays: 30,
+      },
+    ],
+  });
+
+  console.log('✅ Created project templates');
+
+  // Create Workflow Templates
+  await prisma.workflowTemplate.createMany({
+    data: [
+      {
+        name: 'Daily Standup Summary',
+        description: 'Generate automated standup summaries from task updates',
+        category: 'Team Collaboration',
+        organizationId: org.id,
+        isPublic: false,
+        tags: ['standup', 'daily', 'team'],
+        steps: [
+          {
+            id: 'collect-updates',
+            name: 'Collect Task Updates',
+            action: 'TOOL_CALL',
+            config: { tool: 'task_query' },
+          },
+          {
+            id: 'generate-summary',
+            name: 'Generate Summary',
+            action: 'LLM_CALL',
+            config: { agentRole: 'PM' },
+          },
+        ],
+        variables: { timeframe: 'last_24_hours' },
+      },
+      {
+        name: 'Code Review Workflow',
+        description: 'Automated code review process with AI assistance',
+        category: 'Engineering',
+        isPublic: true,
+        tags: ['code-review', 'engineering', 'quality'],
+        steps: [
+          {
+            id: 'fetch-pr',
+            name: 'Fetch Pull Request',
+            action: 'TOOL_CALL',
+          },
+          {
+            id: 'analyze-code',
+            name: 'AI Code Analysis',
+            action: 'LLM_CALL',
+          },
+          {
+            id: 'human-review',
+            name: 'Human Review',
+            action: 'HUMAN_REVIEW',
+          },
+        ],
+      },
+    ],
+  });
+
+  console.log('✅ Created workflow templates');
+
+  // Create Agent Instance and Conversation
+  const agentInstance = await prisma.agentInstance.create({
+    data: {
+      profileId: ceoAgent.id,
+      state: 'COMPLETED',
+      context: {
+        taskId: 'demo-task-1',
+        sessionStart: new Date(),
+      },
+    },
+  });
+
+  await prisma.agentConversation.create({
+    data: {
+      agentInstanceId: agentInstance.id,
+      organizationId: org.id,
+      messages: [
+        {
+          role: 'user',
+          content: 'What are our key priorities for Q1 2024?',
+          timestamp: new Date(),
+        },
+        {
+          role: 'assistant',
+          content: 'Based on current market analysis, our Q1 2024 priorities should be: 1) Launch new AI analytics product, 2) Expand into European market, 3) Strengthen engineering team by 30%',
+          timestamp: new Date(),
+        },
+      ],
+      summary: 'Discussion about Q1 2024 strategic priorities',
+      tokensUsed: 250,
+    },
+  });
+
+  console.log('✅ Created agent conversations');
+
+  // Create Notifications
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: adminUser.id,
+        organizationId: org.id,
+        type: 'TASK_ASSIGNED',
+        title: 'New Task Assigned: Market Analysis Report',
+        message: 'You have been assigned to complete the Market Analysis Report for Q1 2024 Strategic Planning.',
+        priority: 'HIGH',
+        read: false,
+        actionUrl: `/tasks/${strategicProject.id}`,
+      },
+      {
+        userId: adminUser.id,
+        organizationId: org.id,
+        type: 'WORKFLOW_COMPLETED',
+        title: 'Weekly Executive Summary Complete',
+        message: 'The weekly executive summary workflow has completed successfully.',
+        priority: 'NORMAL',
+        read: true,
+        readAt: new Date(),
+      },
+      {
+        userId: memberUser.id,
+        organizationId: org.id,
+        type: 'PROJECT_UPDATED',
+        title: 'New Product Launch - Status Updated',
+        message: 'The project status has been changed to PLANNING. Review the updated timeline.',
+        priority: 'NORMAL',
+        read: false,
+        actionUrl: `/projects/${productProject.id}`,
+      },
+      {
+        userId: memberUser.id,
+        organizationId: org.id,
+        type: 'TASK_DUE_SOON',
+        title: 'Task Due Tomorrow: Product Requirements Document',
+        message: 'The Product Requirements Document task is due tomorrow. Please ensure completion.',
+        priority: 'URGENT',
+        read: false,
+      },
+    ],
+  });
+
+  console.log('✅ Created notifications');
+
+  // Create Metrics
+  const now = new Date();
+  await prisma.metric.createMany({
+    data: [
+      // Project completion metrics
+      {
+        organizationId: org.id,
+        name: 'projects.completed',
+        value: 5,
+        labels: { period: 'week', department: 'engineering' },
+        timestamp: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      },
+      {
+        organizationId: org.id,
+        name: 'projects.completed',
+        value: 8,
+        labels: { period: 'week', department: 'engineering' },
+        timestamp: now,
+      },
+      // Task velocity
+      {
+        organizationId: org.id,
+        name: 'tasks.velocity',
+        value: 23,
+        labels: { sprint: 'sprint-12', team: 'alpha' },
+        timestamp: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+      },
+      {
+        organizationId: org.id,
+        name: 'tasks.velocity',
+        value: 28,
+        labels: { sprint: 'sprint-13', team: 'alpha' },
+        timestamp: now,
+      },
+      // Agent performance
+      {
+        organizationId: org.id,
+        name: 'agent.response_time_ms',
+        value: 1200,
+        labels: { agent: 'ceo', model: 'gpt-4' },
+        timestamp: now,
+      },
+      {
+        organizationId: org.id,
+        name: 'agent.tokens_used',
+        value: 2500,
+        labels: { agent: 'cfo', workflow: 'executive-summary' },
+        timestamp: now,
+      },
+      // Workflow metrics
+      {
+        organizationId: org.id,
+        name: 'workflow.success_rate',
+        value: 0.95,
+        labels: { workflow: 'project-kickoff' },
+        timestamp: now,
+      },
+      {
+        organizationId: org.id,
+        name: 'workflow.avg_duration_seconds',
+        value: 45,
+        labels: { workflow: 'executive-summary' },
+        timestamp: now,
+      },
+    ],
+  });
+
+  console.log('✅ Created metrics');
+
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📊 Summary:');
   console.log(`   - Organization: ${org.name} (${org.slug})`);
   console.log(`   - Users: 2 (1 admin, 1 member)`);
   console.log(`   - Agents: 4 (CEO, CFO, PM, HR)`);
   console.log(`   - Projects: 2`);
+  console.log(`   - Tasks: 4`);
   console.log(`   - Workflows: 2`);
   console.log(`   - Tools: 3 built-in`);
+  console.log(`   - Project Templates: 2`);
+  console.log(`   - Workflow Templates: 2`);
+  console.log(`   - Conversations: 1`);
+  console.log(`   - Notifications: 4`);
+  console.log(`   - Metrics: 8 data points`);
   console.log('\n💡 You can now use these IDs in your .env:');
   console.log(`   NEXT_PUBLIC_DEFAULT_ORG_ID=${org.id}`);
   console.log(`   NEXT_PUBLIC_DEFAULT_USER_ID=${adminUser.id}`);

@@ -19,14 +19,19 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users          User[]
-  projects       Project[]
-  agentProfiles  AgentProfile[]
-  workflows      Workflow[]
-  workflowRuns   WorkflowRun[]
-  jobs           Job[]
-  toolDefinitions ToolDefinition[]
-  auditLogs      AuditLog[]
+  users             User[]
+  projects          Project[]
+  agentProfiles     AgentProfile[]
+  workflows         Workflow[]
+  workflowRuns      WorkflowRun[]
+  jobs              Job[]
+  toolDefinitions   ToolDefinition[]
+  auditLogs         AuditLog[]
+  projectTemplates  ProjectTemplate[]
+  workflowTemplates WorkflowTemplate[]
+  agentConversations AgentConversation[]
+  notifications     Notification[]
+  metrics           Metric[]
 
   @@index([slug])
 }
@@ -48,10 +53,11 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  ownedProjects Project[]    @relation("ProjectOwner")
-  assignedTasks Task[]       @relation("TaskAssignee")
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownedProjects Project[]      @relation("ProjectOwner")
+  assignedTasks Task[]         @relation("TaskAssignee")
   auditLogs     AuditLog[]
+  notifications Notification[]
 
   @@index([organizationId])
   @@index([email])
@@ -174,8 +180,9 @@ model AgentInstance {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
-  profile     AgentProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  workflowRun WorkflowRun?  @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  profile        AgentProfile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  workflowRun    WorkflowRun?        @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  conversations  AgentConversation[]
 
   @@index([profileId])
   @@index([workflowRunId])
@@ -232,9 +239,10 @@ model WorkflowRun {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
-  workflow       Workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflow       Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   agentInstances AgentInstance[]
+  conversations  AgentConversation[]
 
   @@index([workflowId])
   @@index([organizationId])
@@ -330,4 +338,131 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+// ProjectTemplate - Reusable project blueprints
+model ProjectTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?  @db.Text
+  category       String
+  organizationId String?  // null for built-in templates
+  defaultTasks   Json     // Array of task templates
+  metadata       Json?
+  estimatedDays  Int?
+  isPublic       Boolean  @default(false)
+  usageCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isPublic])
+}
+
+// WorkflowTemplate - Reusable workflow definitions
+model WorkflowTemplate {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?  @db.Text
+  category       String
+  organizationId String?  // null for built-in templates
+  steps          Json     // Array of WorkflowStep objects
+  variables      Json?    // Template variables
+  documentation  String?  @db.Text
+  isPublic       Boolean  @default(false)
+  usageCount     Int      @default(0)
+  tags           String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isPublic])
+}
+
+// AgentConversation - Agent interaction logs and decision history
+model AgentConversation {
+  id              String   @id @default(cuid())
+  agentInstanceId String
+  workflowRunId   String?
+  organizationId  String
+  messages        Json     // Array of {role, content, timestamp}
+  context         Json?
+  summary         String?  @db.Text
+  tokensUsed      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  agentInstance AgentInstance @relation(fields: [agentInstanceId], references: [id], onDelete: Cascade)
+  workflowRun   WorkflowRun?  @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([agentInstanceId])
+  @@index([workflowRunId])
+  @@index([organizationId])
+  @@index([createdAt])
+}
+
+// Notification - User notifications for events
+model Notification {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  type           NotificationType
+  title          String
+  message        String           @db.Text
+  actionUrl      String?
+  read           Boolean          @default(false)
+  readAt         DateTime?
+  priority       NotificationPriority @default(NORMAL)
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_DUE_SOON
+  WORKFLOW_COMPLETED
+  WORKFLOW_FAILED
+  PROJECT_UPDATED
+  MENTION
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Metric - Time-series metrics for analytics
+model Metric {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  value          Float
+  labels         Json?    // Key-value pairs for filtering
+  timestamp      DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([name])
+  @@index([timestamp])
+  @@index([organizationId, name, timestamp])
 }

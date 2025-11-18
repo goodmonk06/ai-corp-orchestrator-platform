@@ -7,3 +7,7 @@ export * from './workflow';
 export * from './job';
 export * from './tool';
 export * from './audit';
+export * from './template';
+export * from './conversation';
+export * from './notification';
+export * from './metric';
